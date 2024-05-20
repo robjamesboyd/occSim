@@ -88,6 +88,8 @@ simulateSample <- function(occ,
       ggplot2::labs(x="Year", y="Occupancy", colour="")
   )
   
+  print(paste("Sampling fraction (n/N) per year:", rowMeans(sampling_results)))
+  
   return(list(summary=df,
               data=observed_occupancy,
               sample_inclusion=sampling_results))
