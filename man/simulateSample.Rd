@@ -4,7 +4,13 @@
 \alias{simulateSample}
 \title{Simulate Sampling Process for Occupancy Data}
 \usage{
-simulateSample(occ, beta0, beta, explanatoryVar)
+simulateSample(
+  occ,
+  beta0 = NULL,
+  beta = NULL,
+  explanatoryVar = NULL,
+  sampling_probabilities = NULL
+)
 }
 \arguments{
 \item{occ}{Output of simulateOccupancy. A list containing at least one element named 'simulated_data', which should be a matrix where
@@ -16,6 +22,8 @@ each entry denotes occupancy (1 = occupied, 0 = not occupied) for each site acro
 
 \item{explanatoryVar}{A numeric vector or scalar of the explanatory variable used in logistic regression,
 matching the number of rows in \code{occ$simulated_data}.}
+
+\item{sampling_probabilities}{Numeric vector or scalar. Probability that each site gets sampled per year. Must match the number of sites in occ.}
 }
 \value{
 A list with three elements:

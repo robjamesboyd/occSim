@@ -8,16 +8,20 @@ simulateOccupancy(
   nYears,
   nSites,
   explanatoryVar,
-  beta0_extinction,
-  beta0_colonization,
+  discreteExplanatoryVar = FALSE,
+  beta0_extinction = NULL,
+  beta0_colonization = NULL,
   beta0_initial = NULL,
-  beta_extinction,
-  beta_colonization,
+  beta_extinction = NULL,
+  beta_colonization = NULL,
   beta_initial = NULL,
   randomInitial = FALSE,
   randomInitialPsi = NULL,
-  nBins,
-  plot = "occupancy"
+  nBins = NULL,
+  plot = "occupancy",
+  colonisation_probs = NULL,
+  extinction_probs = NULL,
+  initial_occupancy_probs = NULL
 )
 }
 \arguments{
@@ -26,6 +30,8 @@ simulateOccupancy(
 \item{nSites}{Integer. The number of sites to include in the simulation.}
 
 \item{explanatoryVar}{Numeric vector. A vector of explanatory variables influencing occupancy, which must have length nSite.}
+
+\item{discreteExplanatoryVar}{Logical. Whether the explanatory variable is categorical. The number of bins is set to the number of levels of the variable for categorical variables. This overrides the argument nBins.}
 
 \item{beta0_extinction}{Numeric. Intercept for the extinction probability.}
 
@@ -46,6 +52,12 @@ simulateOccupancy(
 \item{nBins}{Integer. The number of bins to divide the explanatory variable into.}
 
 \item{plot}{Character. Specifies the plot type to generate: "occupancy" for overall occupancy or "bin" for occupancy by bin.}
+
+\item{extinction_probs}{Numeric. A vector of extinction probabilities. Must be of length nSites. If supplied, extinction probabilities will not be modelled as a function of explanatoryVar.}
+
+\item{initial_occupancy_probs}{Numeric. A vector of initial occupancy probabilities for the first year. Must be of length nSites. If supplied, initial occupancy probabilities will not be modelled as a function of explanatoryVar.}
+
+\item{colonisaton_probs}{Numeric. A vector of colonisation probabilities. Must be of length nSites. If supplied, colonisation probabilities will not be modelled as a function of explanatoryVar.}
 }
 \value{
 A list containing:

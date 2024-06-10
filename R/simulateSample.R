@@ -12,6 +12,7 @@
 #' @param beta Coefficient (scalar) for the logistic regression model associated with the explanatory variable.
 #' @param explanatoryVar A numeric vector or scalar of the explanatory variable used in logistic regression,
 #'   matching the number of rows in `occ$simulated_data`.
+#' @param sampling_probabilities Numeric vector or scalar. Probability that each site gets sampled per year. Must match the number of sites in occ. 
 #'
 #' @return A list with three elements:
 #'   - `summary`: A dataframe with columns `year`, `real`, and `obs` representing the year, the mean real occupancy,
@@ -37,9 +38,10 @@
 #' @export
 
 simulateSample <- function(occ,
-                           beta0,
-                           beta,
-                           explanatoryVar) {
+                           beta0 = NULL,
+                           beta = NULL,
+                           explanatoryVar = NULL,
+                           sampling_probabilities = NULL) {
   
   # extract simulated data from occ object
   occ <- occ$simulated_data
@@ -48,8 +50,24 @@ simulateSample <- function(occ,
   nYears <- nrow(occ)
   nSites <- ncol(occ)
 
-  # Calculate sampling probabilities
-  sampling_probability <- 1 / (1 + exp(-(beta0 + beta * explanatoryVar)))
+  # Check for consistency in vector lengths when using logistic regression
+  if (is.null(sampling_probabilities)) {
+    if (is.null(beta0) || is.null(beta) || is.null(explanatoryVar)) {
+      stop("Parameters 'beta0', 'beta', and 'explanatoryVar' must be provided when 'sampling_probabilities' is not specified.")
+    }
+    if (length(explanatoryVar) != nSites) {
+      stop("Length of 'explanatoryVar' must match the number of rows (years) in 'occ$simulated_data'.")
+    }
+  }
+  
+  if(!is.null(sampling_probabilities) & length(sampling_probabilities) != nSites) stop("There should be one sampling weight per site")
+  
+  if (!is.null(explanatoryVar) && length(explanatoryVar) != nSites) {
+    stop("Length of 'explanatoryVar' must match the number of rows in 'occ$simulated_data'.")
+  }
+  
+  # Calculate sampling probabilities based on logistic model if they're not specified explicitly 
+  if (is.null(sampling_probabilities)) sampling_probabilities <- 1 / (1 + exp(-(beta0 + beta * explanatoryVar)))
 
   # Initialize sampling results matrix (0 = not sampled, 1 = sampled)
   sampling_results <- matrix(nrow = nYears, ncol = nSites)
@@ -57,7 +75,7 @@ simulateSample <- function(occ,
   # Simulate the sampling process over time
   for (t in 1:nYears) {
     # For each site, decide if it is sampled based on the sampling probability
-    sampling_results[t, ] <- rbinom(nSites, 1, sampling_probability)
+    sampling_results[t, ] <- rbinom(nSites, 1, sampling_probabilities)
   }
 
   # Calculate the observed occupancy based on both the true occupancy and whether the site was sampled

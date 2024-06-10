@@ -196,4 +196,3 @@ simulateOccupancy <- function(nYears,
               simulated_data = results))
 }
 
-document()
