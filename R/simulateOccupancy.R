@@ -6,6 +6,7 @@
 #' @param nYears Integer. The number of years over which to simulate occupancy.
 #' @param nSites Integer. The number of sites to include in the simulation.
 #' @param explanatoryVar Numeric vector. A vector of explanatory variables influencing occupancy, which must have length nSite.
+#' @param discreteExplanatoryVar Logical. Whether the explanatory variable is categorical. The number of bins is set to the number of levels of the variable for categorical variables. This overrides the argument nBins.
 #' @param beta0_extinction Numeric. Intercept for the extinction probability.
 #' @param beta0_colonization Numeric. Intercept for the colonization probability.
 #' @param beta0_initial Numeric. Intercept for the initial occupancy probability.
@@ -16,7 +17,9 @@
 #' @param randomInitialPsi Numeric. If `randomInitial` is `TRUE`, the probability of initial occupancy.
 #' @param nBins Integer. The number of bins to divide the explanatory variable into.
 #' @param plot Character. Specifies the plot type to generate: "occupancy" for overall occupancy or "bin" for occupancy by bin.
-#'
+#' @param colonisaton_probs Numeric. A vector of colonisation probabilities. Must be of length nSites. If supplied, colonisation probabilities will not be modelled as a function of explanatoryVar.
+#' @param extinction_probs Numeric. A vector of extinction probabilities. Must be of length nSites. If supplied, extinction probabilities will not be modelled as a function of explanatoryVar.
+#' @param initial_occupancy_probs Numeric. A vector of initial occupancy probabilities for the first year. Must be of length nSites. If supplied, initial occupancy probabilities will not be modelled as a function of explanatoryVar.
 #' @return A list containing:
 #' \itemize{
 #'   \item `occupancy_all_sites`: A data frame of overall occupancy probabilities over time.
@@ -53,34 +56,77 @@
 simulateOccupancy <- function(nYears, 
                               nSites, 
                               explanatoryVar,
-                              beta0_extinction,
-                              beta0_colonization,
+                              discreteExplanatoryVar = FALSE,
+                              beta0_extinction = NULL,
+                              beta0_colonization = NULL,
                               beta0_initial = NULL,
-                              beta_extinction,
-                              beta_colonization,
+                              beta_extinction = NULL,
+                              beta_colonization = NULL,
                               beta_initial = NULL,
                               randomInitial = FALSE,
                               randomInitialPsi = NULL,
-                              nBins,
-                              plot = "occupancy") {
+                              nBins = NULL,
+                              plot = "occupancy",
+                              colonisation_probs = NULL,
+                              extinction_probs = NULL,
+                              initial_occupancy_probs = NULL) {
+  
+  # some checks
+  # Check if explicit probabilities are provided and have correct length
+  if (!is.null(colonisation_probs) && length(colonisation_probs) != nSites) {
+    stop("Colonisation probabilities must have the same length as the number of sites.")
+  }
+  if (!is.null(extinction_probs) && length(extinction_probs) != nSites) {
+    stop("Extinction probabilities must have the same length as the number of sites.")
+  }
+  if (!is.null(initial_occupancy_probs) && length(initial_occupancy_probs) != nSites) {
+    stop("Initial occupancy probabilities must have the same length as the number of sites.")
+  }
+  
+  # Check if randomInitialPsi is provided when randomInitial is TRUE
+  if (randomInitial && is.null(randomInitialPsi)) {
+    stop("Parameter 'randomInitialPsi' must be specified when 'randomInitial' is TRUE.")
+  }
   
   # Calculate extinction and colonization probabilities
   # These include both intercept and slope components
-  epsilon <- 1 / (1 + exp(-(beta0_extinction + beta_extinction * explanatoryVar)))
-  gamma <- 1 / (1 + exp(-(beta0_colonization + beta_colonization * explanatoryVar)))
-
-  # initial occupancy
-  if (randomInitial) {
-    occupancy <- sample(c(0, 1), nSites, replace = TRUE, prob = c(1-randomInitialPsi, randomInitialPsi))
+  if (is.null(extinction_probs)) {
+    epsilon <- 1 / (1 + exp(-(beta0_extinction + beta_extinction * explanatoryVar)))
   } else {
-    initial_occupancy_prob <- 1 / (1 + exp(-(beta0_initial + beta_initial * explanatoryVar)))
-    occupancy <- rbinom(nSites, 1, initial_occupancy_prob)
+    epsilon <- extinction_probs
   }
-
+  
+  if (is.null(colonisation_probs)) {
+    gamma <- 1 / (1 + exp(-(beta0_colonization + beta_colonization * explanatoryVar)))
+  } else {
+    gamma <- colonisation_probs
+  }
+  
+  
+  # initial occupancy
+  # Calculate initial occupancy probabilities based on the setup
+  if (randomInitial) {
+    # Use random initialization with provided Psi probability
+    occupancy <- sample(c(0, 1), nSites, replace = TRUE, prob = c(1 - randomInitialPsi, randomInitialPsi))
+  } else {
+    # Non-random initial occupancy requires explicit or model-based probabilities
+    if (is.null(initial_occupancy_probs)) {
+      # Calculate initial probabilities from model parameters if not already provided
+      if (!is.null(beta0_initial) && !is.null(beta_initial)) {
+        initial_occupancy_probs <- 1 / (1 + exp(-(beta0_initial + beta_initial * explanatoryVar)))
+      } else {
+        stop("Initial model parameters must be provided when using model-based initial occupancy without predefined probabilities.")
+      }
+    }
+    # Generate initial occupancy based on the calculated or provided probabilities
+    occupancy <- rbinom(nSites, 1, initial_occupancy_probs)
+  }
+  
+  
   # Initialize results matrix
   results <- matrix(nrow = nYears, ncol = nSites)
   results[1, ] <- occupancy
-
+  
   # Simulation over time using updated probabilities
   for (t in 2:nYears) {
     for (i in 1:nSites) {
@@ -93,13 +139,16 @@ simulateOccupancy <- function(nYears,
       }
     }
   }
-
+  
   true_occupancy <- data.frame(occupancy = rowMeans(results),
                                year = 1:nYears)
-
+  
+  # manually override number of bins in case of categorical explanatory variable
+  if (discreteExplanatoryVar) nBins <- length(unique(explanatoryVar))
+  
   # Discretize explanatoryVar
   bins <- cut(explanatoryVar, breaks = nBins, labels = FALSE)
-
+  
   # Prepare a data frame to store results by bin for each time step
   occupancy_by_bin <- data.frame(matrix(ncol = nBins, nrow = nrow(results)))
   
@@ -125,18 +174,19 @@ simulateOccupancy <- function(nYears,
       ggplot2::ggplot(occupancy_long, ggplot2::aes(x = Year, y = Occupancy, color = Bin)) +
         ggplot2::geom_line() +
         ggplot2::labs(title = "",
-             x = "Year",
-             y = "Occupancy") +
+                      x = "Year",
+                      y = "Occupancy",
+                      color = "") +
         ggplot2::theme_linedraw()
     )
-
+    
   } else {
     print(
-     ggplot2::ggplot(true_occupancy, ggplot2::aes(x = year, y = occupancy)) +
+      ggplot2::ggplot(true_occupancy, ggplot2::aes(x = year, y = occupancy)) +
         ggplot2::geom_line() +
         ggplot2::labs(title = "",
-             x = "Year",
-             y = "Occupancy") +
+                      x = "Year",
+                      y = "Occupancy") +
         ggplot2::theme_linedraw()
     )
   }
@@ -145,3 +195,5 @@ simulateOccupancy <- function(nYears,
               occupancy_per_bin = occupancy_by_bin,
               simulated_data = results))
 }
+
+document()
