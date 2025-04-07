@@ -1,114 +1,58 @@
-#' Simulate Sampling Process for Occupancy Data
+#' Simulate Sampling Visits Across Sites and Years
 #'
-#' This function simulates the sampling process for a given occupancy dataset over multiple years and sites,
-#' based on logistic regression parameters. It applies logistic regression to predict sampling probabilities
-#' using an explanatory variable. It returns a list that includes a dataframe summarizing the real and observed
-#' occupancy rates per year, the matrix of observed occupancy data, and a matrix indicating whether each site
-#' was sampled each year.
+#' This function simulates whether a site is sampled on each of several visits per year,
+#' with sampling probability determined by a logistic function of a site-level explanatory variable.
+#' The number of sites and years is inferred from the dimensions of a provided occupancy matrix.
 #'
-#' @param occ Output of simulateOccupancy. A list containing at least one element named 'simulated_data', which should be a matrix where
-#'   each entry denotes occupancy (1 = occupied, 0 = not occupied) for each site across several years.
-#' @param beta0 Intercept (scalar) for the logistic regression model used to calculate sampling probabilities.
-#' @param beta Coefficient (scalar) for the logistic regression model associated with the explanatory variable.
-#' @param explanatoryVar A numeric vector or scalar of the explanatory variable used in logistic regression,
-#'   matching the number of rows in `occ$simulated_data`.
-#' @param sampling_probabilities Numeric vector or scalar. Probability that each site gets sampled per year. Must match the number of sites in occ. 
+#' @param Y A matrix of true occupancy states for each site and year, with dimensions \code{nSites × nYears}.
+#' This is used to determine the number of sites and years to simulate.
+#' @param nVisits Integer. The number of sampling visits per year (assumed to be the same for all site-year combinations).
+#' @param z Numeric vector. A site-level covariate influencing the probability of being sampled on each visit.
+#' Must be of length equal to the number of rows (sites) in \code{Y}.
+#' @param alpha_psi Numeric. The intercept on the logit scale for the sampling probability.
+#' @param beta_psi Numeric. The slope on the logit scale for the effect of the covariate \code{z} on the sampling probability.
 #'
-#' @return A list with three elements:
-#'   - `summary`: A dataframe with columns `year`, `real`, and `obs` representing the year, the mean real occupancy,
-#'     and the mean observed occupancy, respectively.
-#'   - `data`: A matrix of observed occupancy values (1 or NA) matching the structure of the input `occ$simulated_data`.
-#'   - `sample_inclusion`: A matrix indicating whether a site was sampled (1) or not (0) across all years.
+#' @return A 3-dimensional array of sampling states with dimensions \code{[nSites, nYears, nVisits]}.
+#' Each element \code{S[i, t, v]} is a binary indicator equal to 1 if site \code{i} was sampled on visit \code{v} in year \code{t}, and 0 otherwise.
 #'
 #' @examples
-#' # Assuming 'occ' is a list with a matrix of simulated data
-#' nYears <- 10
-#' nSites <- 5
-#' simulated_data <- matrix(rbinom(nYears * nSites, 1, 0.5), nrow = nYears)
-#' occ <- list(simulated_data = simulated_data)
-#' beta0 <- 0.5
-#' beta <- -0.3
-#' explanatoryVar <- runif(nYears)
+#' # Simulate an occupancy matrix first
+#' set.seed(123)
+#' nSites <- 100
+#' nYears <- 5
+#' Y <- matrix(rbinom(nSites * nYears, 1, 0.5), nrow = nSites, ncol = nYears)
 #'
-#' results <- simulateSample(occ, beta0, beta, explanatoryVar)
-#' print(results$summary)
+#' # Simulate site-level sampling covariate
+#' z <- rnorm(nSites)
 #'
-#' @importFrom reshape2 melt
-#' @importFrom ggplot2 ggplot aes geom_line theme_linedraw labs
+#' # Simulate 3 visits per year using a moderate sampling bias
+#' S <- simulateSample(Y, nVisits = 3, z = z, alpha_psi = -1, beta_psi = 2)
+#'
+#' # Check the dimensions and a sample of visit outcomes
+#' dim(S)
+#' S[1, , ]
+#'
 #' @export
-
-simulateSample <- function(occ,
-                           beta0 = NULL,
-                           beta = NULL,
-                           explanatoryVar = NULL,
-                           sampling_probabilities = NULL) {
+simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi) {
+  # --- Get dimensions from occupancy matrix ---
+  nSites <- nrow(Y)
+  nYears <- ncol(Y)
   
-  # extract simulated data from occ object
-  occ <- occ$simulated_data
+  # --- Initialise output array ---
+  S <- array(0, dim = c(nSites, nYears, nVisits))
   
-  # get dimensions
-  nYears <- nrow(occ)
-  nSites <- ncol(occ)
-
-  # Check for consistency in vector lengths when using logistic regression
-  if (is.null(sampling_probabilities)) {
-    if (is.null(beta0) || is.null(beta) || is.null(explanatoryVar)) {
-      stop("Parameters 'beta0', 'beta', and 'explanatoryVar' must be provided when 'sampling_probabilities' is not specified.")
-    }
-    if (length(explanatoryVar) != nSites) {
-      stop("Length of 'explanatoryVar' must match the number of rows (years) in 'occ$simulated_data'.")
-    }
-  }
+  # --- Compute sampling probabilities per site ---
+  # psi[i] is the probability that site i is sampled on any one visit
+  psi <- plogis(alpha_psi + beta_psi * z)
   
-  if(!is.null(sampling_probabilities) & length(sampling_probabilities) != nSites) stop("There should be one sampling weight per site")
-  
-  if (!is.null(explanatoryVar) && length(explanatoryVar) != nSites) {
-    stop("Length of 'explanatoryVar' must match the number of rows in 'occ$simulated_data'.")
-  }
-  
-  # Calculate sampling probabilities based on logistic model if they're not specified explicitly 
-  if (is.null(sampling_probabilities)) sampling_probabilities <- 1 / (1 + exp(-(beta0 + beta * explanatoryVar)))
-
-  # Initialize sampling results matrix (0 = not sampled, 1 = sampled)
-  sampling_results <- matrix(nrow = nYears, ncol = nSites)
-
-  # Simulate the sampling process over time
+  # --- Loop over years and visits ---
   for (t in 1:nYears) {
-    # For each site, decide if it is sampled based on the sampling probability
-    sampling_results[t, ] <- rbinom(nSites, 1, sampling_probabilities)
-  }
-
-  # Calculate the observed occupancy based on both the true occupancy and whether the site was sampled
-  observed_occupancy <- matrix(nrow = nYears, ncol = nSites)
-
-  # Fill in the observed occupancy based on both the true occupancy and whether the site was sampled
-  for (t in 1:nYears) {
-    for (i in 1:nSites) {
-      if (sampling_results[t, i] == 1) {
-        observed_occupancy[t, i] = occ[t, i]
-      } else {
-        observed_occupancy[t, i] = NA  # Mark as missing data
-      }
+    for (v in 1:nVisits) {
+      # For each visit in each year, sample visit occurrence
+      S[, t, v] <- rbinom(nSites, size = 1, prob = psi)
     }
   }
-
-  df <- data.frame(year = 1:nYears,
-                   real = rowMeans(occ),
-                   obs = rowMeans(observed_occupancy, na.rm = T))
-
-  df_long <- reshape2::melt(df, id.vars = "year", measure.vars = c("real", "obs"),
-                  variable.name = "type", value.name = "value")
-
-  print(
-    ggplot2::ggplot(data=df_long, ggplot2::aes(x=year, y=value, colour=type)) +
-      ggplot2::geom_line() +
-      ggplot2::theme_linedraw() +
-      ggplot2::labs(x="Year", y="Occupancy", colour="")
-  )
   
-  print(paste("Sampling fraction (n/N) per year:", rowMeans(sampling_results)))
-  
-  return(list(summary=df,
-              data=observed_occupancy,
-              sample_inclusion=sampling_results))
+  # Return sampling array
+  return(S)
 }
