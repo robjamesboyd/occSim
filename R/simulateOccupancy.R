@@ -123,24 +123,23 @@ simulateOccupancy <- function(nYears,
   }
   
   
-  # Initialize results matrix
-  results <- matrix(nrow = nYears, ncol = nSites)
-  results[1, ] <- occupancy
+  # Initialize results matrix [sites x years]
+  results <- matrix(nrow = nSites, ncol = nYears)
+  results[, 1] <- occupancy
   
   # Simulation over time using updated probabilities
   for (t in 2:nYears) {
     for (i in 1:nSites) {
-      if (results[t-1, i] == 1) {
-        # Extinction check
-        results[t, i] = rbinom(1, 1, 1 - epsilon[i])
+      if (results[i, t - 1] == 1) {
+        results[i, t] <- rbinom(1, 1, 1 - epsilon[i])
       } else {
-        # Colonization check
-        results[t, i] = rbinom(1, 1, gamma[i])
+        results[i, t] <- rbinom(1, 1, gamma[i])
       }
     }
   }
   
-  true_occupancy <- data.frame(occupancy = rowMeans(results),
+  
+  true_occupancy <- data.frame(occupancy = colMeans(results),
                                year = 1:nYears)
   
   # manually override number of bins in case of categorical explanatory variable
@@ -155,14 +154,13 @@ simulateOccupancy <- function(nYears,
   colnames(occupancy_by_bin) <- paste("Bin", 1:nBins, sep = "_")
   
   # Step 2: Calculate mean occupancy for each bin at each time step
-  for (i in 1:nrow(results)) {
+  for (i in 1:nYears) {
     for (j in 1:nBins) {
-      # Select columns (sites) that fall into the current bin
       sites_in_bin <- which(bins == j)
-      # Calculate mean occupancy for these sites at this time step
-      occupancy_by_bin[i, j] <- mean(results[i, sites_in_bin])
+      occupancy_by_bin[i, j] <- mean(results[sites_in_bin, i])
     }
   }
+  
   
   # Add a column for the year indices
   occupancy_by_bin$Year <- 1:nrow(occupancy_by_bin)
