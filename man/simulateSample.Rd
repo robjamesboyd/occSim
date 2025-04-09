@@ -2,56 +2,39 @@
 % Please edit documentation in R/simulateSample.R
 \name{simulateSample}
 \alias{simulateSample}
-\title{Simulate Sampling Process for Occupancy Data}
+\title{Simulate Sampling Visits Across Sites and Years}
 \usage{
-simulateSample(
-  occ,
-  beta0 = NULL,
-  beta = NULL,
-  explanatoryVar = NULL,
-  sampling_probabilities = NULL
-)
+simulateSample(Y, nVisits, z, alpha_psi, beta_psi, plot = TRUE)
 }
 \arguments{
-\item{occ}{Output of simulateOccupancy. A list containing at least one element named 'simulated_data', which should be a matrix where
-each entry denotes occupancy (1 = occupied, 0 = not occupied) for each site across several years.}
+\item{Y}{Matrix \link{nSites x nYears} of true occupancy states.}
 
-\item{beta0}{Intercept (scalar) for the logistic regression model used to calculate sampling probabilities.}
+\item{nVisits}{Integer. Number of visit occasions per year.}
 
-\item{beta}{Coefficient (scalar) for the logistic regression model associated with the explanatory variable.}
+\item{z}{Numeric vector. Site-level covariate for sampling probability.}
 
-\item{explanatoryVar}{A numeric vector or scalar of the explanatory variable used in logistic regression,
-matching the number of rows in \code{occ$simulated_data}.}
+\item{alpha_psi, }{beta_psi Numeric. Intercept and slope for sampling probability (on logit scale).}
 
-\item{sampling_probabilities}{Numeric vector or scalar. Probability that each site gets sampled per year. Must match the number of sites in occ.}
+\item{plot}{Logical. If TRUE, display 3 time-series. Panel 1 is occupancy at sampled (at least once) vs. all sites;
+panel 2 is the sampling fraction (number of sampled sites / total number of sites); and panel 3 is correlation
+between sample inclusion (1/0) and occupancy (1/0), or the 'data defect correlation'.}
 }
 \value{
-A list with three elements:
+A list with:
 \itemize{
-\item \code{summary}: A dataframe with columns \code{year}, \code{real}, and \code{obs} representing the year, the mean real occupancy,
-and the mean observed occupancy, respectively.
-\item \code{data}: A matrix of observed occupancy values (1 or NA) matching the structure of the input \code{occ$simulated_data}.
-\item \code{sample_inclusion}: A matrix indicating whether a site was sampled (1) or not (0) across all years.
+\item \code{S}: Sampling array \link{nSites x nYears x nVisits}
+\item \code{sampled_once}: Matrix \link{nSites x nYears}, 1 if sampled at least once
+\item \code{summary_df}: Data frame with one row per year:
+\code{Year, sampling_fraction, mean_occ_all, mean_occ_sampled, data_defect}
 }
 }
 \description{
-This function simulates the sampling process for a given occupancy dataset over multiple years and sites,
-based on logistic regression parameters. It applies logistic regression to predict sampling probabilities
-using an explanatory variable. It returns a list that includes a dataframe summarizing the real and observed
-occupancy rates per year, the matrix of observed occupancy data, and a matrix indicating whether each site
-was sampled each year.
+This function simulates whether a site is sampled on each of several visits per year,
+with sampling probability determined by a logistic function of a site-level explanatory variable.
+It returns:
+\itemize{
+\item The 3D sampling array,
+\item A matrix indicating whether each site was sampled at least once per year,
+\item A 3-panel plot comparing occupancy, sampling fraction, and sampling-occupancy correlation.
 }
-\examples{
-# Assuming 'occ' is a list with a matrix of simulated data
-nYears <- 10
-nSites <- 5
-simulated_data <- matrix(rbinom(nYears * nSites, 1, 0.5), nrow = nYears)
-occ <- list(simulated_data = simulated_data)
-beta0 <- 0.5
-beta <- -0.3
-explanatoryVar <- runif(nYears)
-
-results <- simulateSample(occ, beta0, beta, explanatoryVar)
-print(results$summary)
-
 }
