@@ -17,26 +17,24 @@ oneSample <- function(sample,
                       sample_inclusion_prob_SRS,
                       target_error_biased_sample) {
   
-  if (sample==1) {
-    occupancy_matrix <- simulateOccupancy(
-      nYears = nYears,
-      nSites = nSites,
-      explanatoryVar = z,
-      discreteExplanatoryVar = FALSE,
-      beta0_extinction = alpha_extinction,
-      beta0_colonization = alpha_colonisation,
-      beta0_initial = alpha_initial,
-      beta_extinction = beta_extinction,
-      beta_colonization = beta_colonisation,
-      beta_initial = beta_initial,
-      randomInitial = FALSE,
-      randomInitialPsi = 0.5,
-      nBins = 5,
-      plot = FALSE
-    )$simulated_data
-  }
+  
   # Use simulateOccupancy() to get the true states
- 
+  occupancy_matrix <- simulateOccupancy(
+    nYears = nYears,
+    nSites = nSites,
+    explanatoryVar = z,
+    discreteExplanatoryVar = FALSE,
+    beta0_extinction = alpha_extinction,
+    beta0_colonization = alpha_colonisation,
+    beta0_initial = alpha_initial,
+    beta_extinction = beta_extinction,
+    beta_colonization = beta_colonisation,
+    beta_initial = beta_initial,
+    randomInitial = FALSE,
+    randomInitialPsi = 0.5,
+    nBins = 5,
+    plot = FALSE
+  )$simulated_data
   
   
   # 2. -------------------------------
