@@ -14,9 +14,9 @@ find_sampling_intercept <- function(target_f, Z, beta, V = 1, tol = 1e-5, maxit 
   return(out$root)
 }
 
-target_f <- 0.1
+target_f <- 0.5
 Z <- z
 V <- 1
 beta <- 2
-alpha <- find_sampling_intercept(target_f=0.1, Z=z, V=1,beta=2)
+alpha <- find_sampling_intercept(target_f=0.5, Z=z, V=1,beta=2)
 alpha

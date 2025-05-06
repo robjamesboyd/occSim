@@ -2,20 +2,15 @@
 #'
 #' This function simulates whether a site is sampled on each of several visits per year,
 #' with sampling probability determined by a logistic function of a site-level explanatory variable.
-#' It returns:
-#' \itemize{
-#'   \item The 3D sampling array,
-#'   \item A matrix indicating whether each site was sampled at least once per year,
-#'   \item A 3-panel plot comparing occupancy, sampling fraction, and sampling-occupancy correlation.
-#' }
+#' Optionally, the same sites may be sampled in all years (a fixed panel design).
 #'
 #' @param Y Matrix [nSites x nYears] of true occupancy states.
 #' @param nVisits Integer. Number of visit occasions per year.
 #' @param z Numeric vector. Site-level covariate for sampling probability.
 #' @param alpha_psi, beta_psi Numeric. Intercept and slope for sampling probability (on logit scale).
-#' @param plot Logical. If TRUE, display 3 time-series. Panel 1 is occupancy at sampled (at least once) vs. all sites;
-#' panel 2 is the sampling fraction (number of sampled sites / total number of sites); and panel 3 is correlation
-#' between sample inclusion (1/0) and occupancy (1/0), or the 'data defect correlation'.
+#' @param fixed_panel Logical. If TRUE, the same sites sampled in year 1 are sampled in all subsequent years.
+#' @param plot Logical. If TRUE, display 3 time-series: (1) occupancy at sampled vs. all sites,
+#' (2) the sampling fraction, and (3) correlation between sample inclusion and occupancy.
 #'
 #' @return A list with:
 #' \itemize{
@@ -28,7 +23,7 @@
 #' @importFrom ggplot2 ggplot aes geom_line labs theme_linedraw scale_color_manual
 #' @importFrom patchwork wrap_plots
 #' @export
-simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, plot = TRUE) {
+simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, fixed_panel = FALSE, plot = TRUE) {
   if (!is.matrix(Y)) stop("Y must be a matrix of dimensions [nSites, nYears]")
   nSites <- nrow(Y)
   nYears <- ncol(Y)
@@ -40,9 +35,20 @@ simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, plot = TRUE) {
   S <- array(0, dim = c(nSites, nYears, nVisits))
   psi <- plogis(alpha_psi + beta_psi * z)
   
-  for (t in 1:nYears) {
+  if (fixed_panel) {
+    # Sample only in year 1
+    sampled_first_year <- matrix(0, nrow = nSites, ncol = nVisits)
     for (v in 1:nVisits) {
-      S[, t, v] <- rbinom(nSites, 1, psi)
+      sampled_first_year[, v] <- rbinom(nSites, 1, psi)
+    }
+    for (t in 1:nYears) {
+      S[, t, ] <- sampled_first_year
+    }
+  } else {
+    for (t in 1:nYears) {
+      for (v in 1:nVisits) {
+        S[, t, v] <- rbinom(nSites, 1, psi)
+      }
     }
   }
   
@@ -93,7 +99,7 @@ simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, plot = TRUE) {
     
     p_corr <- ggplot2::ggplot(summary_df, ggplot2::aes(x = Year, y = data_defect)) +
       ggplot2::geom_line(size = 1.2, color = "darkgreen") +
-      ggplot2::labs(title = "Data defect correlation",
+      ggplot2::labs(title = "Data Defect Correlation",
                     y = "r", x = "Year") +
       ggplot2::theme_linedraw()
     
