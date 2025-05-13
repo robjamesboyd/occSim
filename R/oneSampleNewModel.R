@@ -18,6 +18,7 @@ oneSample <- function(sample,
                       target_error_biased_sample,
                       rho) {
   
+  cat("sample ", sample, "\n")
   
   # Use simulateOccupancy() to get the true states
   occupancy_matrix <- simulateOccupancy(
@@ -36,7 +37,6 @@ oneSample <- function(sample,
     nBins = 5,
     plot = FALSE
   )$simulated_data
-  
   
   # 2. -------------------------------
   # SIMULATE SAMPLING VISITS
@@ -87,6 +87,8 @@ oneSample <- function(sample,
     beta_p = beta_detection,
     plot = FALSE
   )
+  
+  cat("Data simulated", "\n")
   
   ## create covariate and format data to fit model
   x <- rho * z + sqrt(1 - rho^2) * rnorm(nSites)  # x ~ correlated with z
@@ -147,6 +149,8 @@ oneSample <- function(sample,
   names(mle) <- c("beta0_p", "beta0_np", "beta_year", "beta_x_p", "beta_x_np")
   se <- sqrt(diag(solve(fit$hessian)))
   
+  cat("Models fitted", "\n")
+  
   ## compute parameter uncertainty 
   
   # Confidence intervals: Wald-type (estimate ± 1.96 * SE)
@@ -171,8 +175,6 @@ oneSample <- function(sample,
   logit <- function(p) log(p / (1 - p))
 
   true_beta_year <- logit(occ[nYears]) - logit(occ[1])
-  
-  cat("True beta_year (from simulated occupancy change):", round(true_beta_year, 3), "\n")
 
   # Does the confidence interval for beta_year cover the true value? 
   covered <- as.integer(conf_int$CI_Lower[3] <= true_beta_year & conf_int$CI_Upper[3] >= true_beta_year)
