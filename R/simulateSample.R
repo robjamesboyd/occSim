@@ -1,16 +1,20 @@
-#' Simulate Sampling Visits Across Sites and Years
+#' Simulate Sampling Visits Across Sites and Years with Time-Varying Effects
 #'
 #' This function simulates whether a site is sampled on each of several visits per year,
-#' with sampling probability determined by a logistic function of a site-level explanatory variable.
-#' Optionally, the same sites may be sampled in all years (a fixed panel design).
+#' where the probability of sampling is determined by a logistic function of a site-level
+#' covariate that may vary across time. The effect of the covariate may also vary with time
+#' through an interaction with year. Optionally, a fixed panel design can be used, where the
+#' same sites are sampled in all years.
 #'
 #' @param Y Matrix [nSites x nYears] of true occupancy states.
 #' @param nVisits Integer. Number of visit occasions per year.
-#' @param z Numeric vector. Site-level covariate for sampling probability.
-#' @param alpha_psi, beta_psi Numeric. Intercept and slope for sampling probability (on logit scale).
+#' @param z_mat Matrix [nSites x nYears] of site-level covariates affecting sampling probability.
+#' @param alpha_psi Numeric. Intercept for the sampling probability model (logit scale).
+#' @param beta_psi Numeric. Coefficient for the effect of z on sampling probability.
+#' @param beta_year Numeric. Coefficient for the effect of year on sampling probability.
+#' @param beta_year_z Numeric. Coefficient for the interaction between z and year.
 #' @param fixed_panel Logical. If TRUE, the same sites sampled in year 1 are sampled in all subsequent years.
-#' @param plot Logical. If TRUE, display 3 time-series: (1) occupancy at sampled vs. all sites,
-#' (2) the sampling fraction, and (3) correlation between sample inclusion and occupancy.
+#' @param plot Logical. If TRUE, display summary plots of occupancy, sampling, and data defect.
 #'
 #' @return A list with:
 #' \itemize{
@@ -23,38 +27,49 @@
 #' @importFrom ggplot2 ggplot aes geom_line labs theme_linedraw scale_color_manual
 #' @importFrom patchwork wrap_plots
 #' @export
-simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, fixed_panel = FALSE, plot = TRUE) {
+simulateSample <- function(Y, nVisits, z_mat, alpha_psi, beta_psi, beta_year, beta_year_z, fixed_panel = FALSE, plot = TRUE) {
   if (!is.matrix(Y)) stop("Y must be a matrix of dimensions [nSites, nYears]")
+  
   nSites <- nrow(Y)
   nYears <- ncol(Y)
   
-  if (length(z) != nSites) {
-    stop(paste0("Length of z (", length(z), ") must match number of sites (", nSites, ")"))
+  if (!is.matrix(z_mat) || !all(dim(z_mat) == c(nSites, nYears))) {
+    stop("z_mat must be a matrix with dimensions [nSites x nYears]")
   }
   
-  S <- array(0, dim = c(nSites, nYears, nVisits))
-  psi <- plogis(alpha_psi + beta_psi * z)
+  S <- array(0, dim = c(nSites, nYears, nVisits))  # sampling visits
+  psi_mat <- matrix(NA, nSites, nYears)            # sampling probabilities
+  
+  # Compute sampling probabilities (logistic model) for each site-year
+  for (t in 1:nYears) {
+    year_val <- t - 1  # use 0-based coding for year
+    z_t <- z_mat[, t]  # covariate values for year t
+    linpred <- alpha_psi + beta_psi * z_t + beta_year * year_val + beta_year_z * z_t * year_val
+    psi_mat[, t] <- plogis(linpred)  # inverse logit
+  }
   
   if (fixed_panel) {
-    # Sample only in year 1
+    # Sample site-visit combinations in year 1 and repeat across all years
     sampled_first_year <- matrix(0, nrow = nSites, ncol = nVisits)
     for (v in 1:nVisits) {
-      sampled_first_year[, v] <- rbinom(nSites, 1, psi)
+      sampled_first_year[, v] <- rbinom(nSites, 1, psi_mat[, 1])
     }
     for (t in 1:nYears) {
       S[, t, ] <- sampled_first_year
     }
   } else {
+    # Sample independently each year using year-specific probabilities
     for (t in 1:nYears) {
       for (v in 1:nVisits) {
-        S[, t, v] <- rbinom(nSites, 1, psi)
+        S[, t, v] <- rbinom(nSites, 1, psi_mat[, t])
       }
     }
   }
   
+  # Determine whether each site was sampled at least once in each year
   sampled_once <- apply(S, c(1, 2), max)
   
-  # --- Summary stats ---
+  # --- Summary statistics per year ---
   summary_df <- data.frame(
     Year = 1:nYears,
     sampling_fraction = NA_real_,
@@ -66,17 +81,15 @@ simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, fixed_panel = FAL
   for (t in 1:nYears) {
     sampled <- sampled_once[, t]
     occupancy <- Y[, t]
-    
     summary_df$sampling_fraction[t] <- mean(sampled)
     summary_df$mean_occ_all[t] <- mean(occupancy)
-    
     if (any(sampled == 1)) {
       summary_df$mean_occ_sampled[t] <- mean(occupancy[sampled == 1])
       summary_df$data_defect[t] <- cor(occupancy, sampled)
     }
   }
   
-  # --- Optional plots ---
+  # --- Optional diagnostic plots ---
   if (plot) {
     df_occ <- data.frame(
       Year = rep(1:nYears, 2),
@@ -112,3 +125,4 @@ simulateSample <- function(Y, nVisits, z, alpha_psi, beta_psi, fixed_panel = FAL
     summary_df = summary_df
   ))
 }
+

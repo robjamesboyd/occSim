@@ -9,7 +9,6 @@
 #' @param nSites Integer. Number of sites to simulate.
 #' @param z_mat Numeric matrix. A matrix of site-level covariate values, dimension \code{nSites x nYears}.
 #' @param beta0 Numeric. Intercept for the occupancy model.
-#' @param beta_year Numeric. Coefficient for the year effect (interpreted as a linear trend).
 #' @param beta_z Numeric. Coefficient for the covariate \code{z}.
 #' @param plot Logical. Whether to plot the mean occupancy over time.
 #'
