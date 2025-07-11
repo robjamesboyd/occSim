@@ -148,3 +148,27 @@ ggplot(combined_long, aes(x = value, fill = source)) +
   theme_minimal() +
   labs(title = "Coverage of Stratification Variables",
        x = "Value", y = "Density")
+
+library(ggfortify)
+library(ggplot2)
+
+# Run PCA on the full dataset
+pca_full <- prcomp(scenario_data[strat_vars], center = TRUE, scale. = TRUE)
+
+# Project sampled points into the same PCA space
+sampled_proj <- predict(pca_full, newdata = sampled_params[strat_vars]) %>% as.data.frame()
+sampled_proj$group <- "Sampled"
+
+# Get PCA scores for full data (for plotting background)
+full_proj <- pca_full$x %>% as.data.frame()
+full_proj$group <- "Full"
+
+# Combine
+pca_df <- rbind(full_proj, sampled_proj)
+
+# Plot
+ggplot(pca_df, aes(x = PC1, y = PC2, color = group)) +
+  geom_point(alpha = 0.5, size = 1) +
+  scale_color_manual(values = c("Full" = "grey", "Sampled" = "red")) +
+  theme_minimal() +
+  labs(title = "PCA of Stratification Space: Sample Coverage")

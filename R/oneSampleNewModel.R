@@ -271,6 +271,36 @@ oneSample <- function(sample,
                     actual_error_int = conf_int$Estimate[3] - true_beta_year,
                     actual_error_SRS = est_SRS - true_beta_year,
                     actual_error_biased = est_biased - true_beta_year)
+  
+  ## add more summary stats
+  
+  # Bias = cor(x, occupancy)
+  bias_year1 <- cor(S$sampled_once[, 1], occupancy_matrix$simulated_data[, 1])
+  bias_year2 <- cor(S$sampled_once[, 2], occupancy_matrix$simulated_data[, 2])
+  
+  bias_change <- bias_year2 - bias_year1
+  
+  # Sample sizes
+  sample_size1 <- mean(S$sampled_once[, 1])
+  sample_size2 <- mean(S$sampled_once[, 2])
+  sample_size_change <- sample_size2 - sample_size1
+  
+  # Occupancy
+  occ_year1 <- occ[1]
+  occ_year2 <- occ[2]
+  occ_diff <- occ_year2 - occ_year1
+  occ_logit_diff <- logit(occ_year2) - logit(occ_year1)
+  
+  # Add to output
+  out$bias_year1 <- bias_year1
+  out$bias_change <- bias_change
+  out$sample_size1 <- sample_size1
+  out$sample_size2 <- sample_size2
+  out$sample_size_change <- sample_size_change
+  out$occ_year1 <- occ_year1
+  out$occ_diff <- occ_diff
+  out$occ_logit_diff <- occ_logit_diff
+  
 
   return(out)
   
