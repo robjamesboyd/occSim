@@ -14,7 +14,7 @@ beta_detection <- 1
 sd_change_z <- 0.1
 
 # Simulation replicates per scenario
-n_reps <- 3
+n_reps <- 100
 
 # Create w and z (same across reps if desired)
 w <- rnorm(nSites)
@@ -48,6 +48,7 @@ run_scenario <- function(row, scenario_id) {
       mutate(scenario = scenario_id, rep = rep)
   })
   
+  write.csv(do.call(rbind, replicate_out), file = paste0(scenario_id, "out.csv"))
   do.call(rbind, replicate_out)
 }
 

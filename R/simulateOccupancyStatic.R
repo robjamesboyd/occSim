@@ -75,3 +75,4 @@ simulateOccupancyStatic <- function(nYears,
     simulated_data = occupancy
   ))
 }
+
